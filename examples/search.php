@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use FernandoDias\Discogs\Authentication\ConsumerCredentials;
+use FernandoDias\Discogs\DiscogsClient;
 use FernandoDias\Discogs\Http\Psr18Transport;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
@@ -42,66 +43,32 @@ try {
         ),
     );
 
-    $response = $transport->get(
-        path: '/database/search',
-        query: [
-            'q' => $query,
-            'type' => 'master',
-            'page' => 1,
-            'per_page' => 5,
-        ],
+    $discogs = new DiscogsClient(
+        transport: $transport,
     );
 
-    if ($response->getStatusCode() >= 400) {
-        throw new RuntimeException(sprintf(
-            'Discogs returned HTTP %d: %s',
-            $response->getStatusCode(),
-            (string) $response->getBody(),
-        ));
-    }
-
-    $payload = json_decode(
-        json: (string) $response->getBody(),
-        associative: true,
-        flags: JSON_THROW_ON_ERROR,
+    $page = $discogs->searchMasters(
+        query: $query,
+        page: 1,
+        perPage: 5,
     );
 
-    if (! is_array($payload)) {
-        throw new UnexpectedValueException(
-            'Discogs returned an unexpected JSON document.',
-        );
-    }
+    printf(
+        "Results for \"%s\" — page %d of %d, %d total:\n\n",
+        $query,
+        $page->page,
+        $page->totalPages,
+        $page->totalItems,
+    );
 
-    $results = $payload['results'] ?? null;
-
-    if (! is_array($results)) {
-        throw new UnexpectedValueException(
-            'Discogs response does not contain a results array.',
-        );
-    }
-
-    printf("Results for \"%s\":\n\n", $query);
-
-    foreach ($results as $result) {
-        if (! is_array($result)) {
-            continue;
-        }
-
-        $id = $result['id'] ?? null;
-        $title = $result['title'] ?? null;
-        $year = $result['year'] ?? null;
-
-        $idLabel = is_int($id) ? (string) $id : '?';
-        $titleLabel = is_string($title) ? $title : 'Untitled';
-        $yearLabel = is_string($year) || is_int($year)
-            ? (string) $year
-            : 'Unknown year';
-
+    foreach ($page->results as $result) {
         printf(
-            "[%s] %s (%s)\n",
-            $idLabel,
-            $titleLabel,
-            $yearLabel,
+            "[%d] %s (%s)\n",
+            $result->id,
+            $result->title,
+            $result->year === null
+                ? 'Unknown year'
+                : (string) $result->year,
         );
     }
 } catch (Throwable $exception) {
