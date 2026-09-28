@@ -1,0 +1,7 @@
+{
+  "preset": "per",
+  "rules": {
+    "declare_strict_types": true
+  },
+  "exclude": ["build", "vendor"]
+}
